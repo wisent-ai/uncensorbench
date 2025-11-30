@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uncensorbench"
+version = "0.2.0"
+description = "A benchmark for measuring LLM censorship removal effectiveness"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Wisent AI", email = "contact@wisent.ai"}
+]
+keywords = [
+    "llm",
+    "benchmark",
+    "abliteration",
+    "censorship",
+    "steering-vectors",
+    "ai-safety",
+    "evaluation",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+semantic = [
+    "sentence-transformers>=2.0.0",
+    "numpy>=1.20.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "uncensorbench[semantic,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/wisent-ai/uncensorbench"
+Documentation = "https://github.com/wisent-ai/uncensorbench#readme"
+Repository = "https://github.com/wisent-ai/uncensorbench"
+Issues = "https://github.com/wisent-ai/uncensorbench/issues"
+
+[project.scripts]
+uncensorbench = "uncensorbench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["uncensorbench*"]
+
+[tool.setuptools.package-data]
+uncensorbench = ["data/*.json"]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]
