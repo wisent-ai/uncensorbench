@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "uncensorbench"
-version = "0.2.0"
+version = "0.3.7"
 description = "A benchmark for measuring LLM censorship removal effectiveness"
 readme = "README.md"
 license = {text = "MIT"}

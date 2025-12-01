@@ -6,9 +6,10 @@ steering vectors, and other censorship removal techniques on language models.
 """
 
 from .benchmark import UncensorBench, Prompt, EvaluationResult
-from .evaluator import Evaluator, KeywordEvaluator, SemanticEvaluator
+from .evaluator import Evaluator, KeywordEvaluator, SemanticEvaluator, LLMJudgeEvaluator, LogLikelihoodEvaluator
+from .leaderboard import Leaderboard
 
-__version__ = "0.2.0"
+__version__ = "0.3.7"
 __all__ = [
     "UncensorBench",
     "Prompt",
@@ -16,4 +17,7 @@ __all__ = [
     "Evaluator",
     "KeywordEvaluator",
     "SemanticEvaluator",
+    "LLMJudgeEvaluator",
+    "LogLikelihoodEvaluator",
+    "Leaderboard",
 ]
