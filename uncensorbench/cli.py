@@ -4,12 +4,24 @@ Command-line interface for UncensorBench.
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from typing import Optional, List, Callable
 
 from .benchmark import UncensorBench
 from .evaluator import KeywordEvaluator, SemanticEvaluator, LLMJudgeEvaluator
+
+
+def get_default_evaluator() -> str:
+    """
+    Get the default evaluator type based on available API keys.
+
+    Returns "llm-judge" if ANTHROPIC_API_KEY is set, otherwise "semantic".
+    """
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "llm-judge"
+    return "semantic"
 
 
 def load_model(model_name: str, device: str = "auto", dtype: str = "auto"):
@@ -121,9 +133,18 @@ def create_evaluator(
             print("Install with: pip install sentence-transformers")
             sys.exit(1)
     elif evaluator_type == "llm-judge":
-        if model_fn is None:
-            raise ValueError("LLM judge evaluator requires a model function")
-        return LLMJudgeEvaluator(model_fn)
+        try:
+            return LLMJudgeEvaluator()
+        except ImportError:
+            print("ERROR: LLMJudgeEvaluator requires instructor and anthropic.")
+            print("Install with: pip install instructor anthropic")
+            sys.exit(1)
+        except Exception as e:
+            if "ANTHROPIC_API_KEY" in str(e) or "api_key" in str(e).lower():
+                print("ERROR: LLMJudgeEvaluator requires ANTHROPIC_API_KEY environment variable.")
+                print("Falling back to SemanticEvaluator...")
+                return create_evaluator("semantic", semantic_model=semantic_model)
+            raise
     else:
         raise ValueError(f"Unknown evaluator type: {evaluator_type}")
 
@@ -137,10 +158,14 @@ def run_benchmark(
     temperature: float = 0.7,
     output_file: Optional[str] = None,
     verbose: bool = True,
-    evaluator_type: str = "semantic",
+    evaluator_type: Optional[str] = None,
     semantic_model: str = "all-MiniLM-L6-v2",
 ):
     """Run the UncensorBench evaluation on a model."""
+
+    # Use dynamic default evaluator if not specified
+    if evaluator_type is None:
+        evaluator_type = get_default_evaluator()
 
     # Load model
     model, tokenizer = load_model(model_name, device, dtype)
@@ -306,9 +331,9 @@ def main():
         help="Suppress per-prompt output"
     )
     run_parser.add_argument(
-        "--evaluator", "-e", type=str, default="semantic",
+        "--evaluator", "-e", type=str, default=None,
         choices=["keyword", "semantic", "llm-judge"],
-        help="Evaluator type (default: semantic)"
+        help="Evaluator type (default: llm-judge if ANTHROPIC_API_KEY is set, otherwise semantic)"
     )
     run_parser.add_argument(
         "--semantic-model", type=str, default="all-MiniLM-L6-v2",
@@ -357,6 +382,9 @@ def main():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             args.output = f"uncensorbench_{model_short}_{timestamp}.json"
 
+        # Use dynamic default evaluator if not specified
+        evaluator_type = args.evaluator if args.evaluator else get_default_evaluator()
+
         results = run_benchmark(
             model_name=args.model,
             topics=args.topics,
@@ -366,7 +394,7 @@ def main():
             temperature=args.temperature,
             output_file=args.output,
             verbose=not args.quiet,
-            evaluator_type=args.evaluator,
+            evaluator_type=evaluator_type,
             semantic_model=args.semantic_model,
         )
 
