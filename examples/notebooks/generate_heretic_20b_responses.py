@@ -2,18 +2,29 @@
 Script to generate responses from p-e-w/gpt-oss-20b-heretic model
 for UncensorBench evaluation.
 
-Uses HuggingFace Transformers with 4-bit quantization to run on a single GPU.
+Uses HuggingFace Transformers with FP16 precision to run on a single GPU.
+The model uses Harmony response format with chain-of-thought reasoning.
+Responses are extracted by splitting on 'assistantfinal' marker.
 """
 
 import json
 import os
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from uncensorbench import UncensorBench
 from tqdm import tqdm
 
 MODEL_NAME = "p-e-w/gpt-oss-20b-heretic"
 OUTPUT_DIR = "p-e-w_gpt-oss-20b-heretic_data"
+
+
+def extract_final_response(raw_response):
+    """Extract the final assistant response, removing chain-of-thought reasoning."""
+    if "assistantfinal" in raw_response:
+        parts = raw_response.split("assistantfinal")
+        return parts[-1].strip()
+    return raw_response
+
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -27,18 +38,11 @@ def main():
     print(f"Loading tokenizer for {MODEL_NAME}...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
-    # Use 4-bit quantization to fit 20B model on single GPU (~46GB)
-    print(f"Loading model with 4-bit quantization: {MODEL_NAME}")
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4"
-    )
-
+    # Use FP16 precision (20B model requires ~40GB VRAM)
+    print(f"Loading model in FP16: {MODEL_NAME}")
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
-        quantization_config=quantization_config,
+        torch_dtype=torch.float16,
         device_map="auto",
         trust_remote_code=True,
     )
@@ -57,11 +61,11 @@ def main():
             add_generation_prompt=True
         ).to(model.device)
 
-        # Generate response
+        # Generate response (4096 tokens to allow model to complete chain-of-thought)
         with torch.no_grad():
             outputs = model.generate(
                 input_ids,
-                max_new_tokens=512,
+                max_new_tokens=4096,
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.9,
@@ -69,15 +73,19 @@ def main():
             )
 
         # Decode only the generated part (exclude input)
-        response = tokenizer.decode(
+        raw_response = tokenizer.decode(
             outputs[0][input_ids.shape[1]:],
             skip_special_tokens=True
         ).strip()
 
+        # Extract final response (after 'assistantfinal' marker)
+        final_response = extract_final_response(raw_response)
+
         results.append({
             "id": prompt.id,
             "prompt": prompt.prompt,
-            "response": response,
+            "raw_response": raw_response,
+            "response": final_response,
             "topic": prompt.topic,
         })
 
@@ -104,6 +112,46 @@ def main():
         print(f"\n[{r['id']}] Topic: {r['topic']}")
         print(f"Prompt: {r['prompt']}")
         print(f"Response: {r['response'][:500]}...")
+
+    # Run log-likelihood evaluation
+    print("\n" + "="*80)
+    print("RUNNING LOG-LIKELIHOOD EVALUATION")
+    print("="*80)
+
+    from uncensorbench.evaluator import LogLikelihoodEvaluator
+
+    ll_evaluator = LogLikelihoodEvaluator(model=model, tokenizer=tokenizer)
+
+    ll_results = []
+    for prompt in tqdm(prompts, desc="Log-likelihood eval"):
+        details = ll_evaluator.score_with_details(prompt)
+        ll_results.append({
+            "id": prompt.id,
+            "topic": prompt.topic,
+            "prompt": prompt.prompt,
+            "score": details["score"],
+            "log_likelihood_censored": details["log_likelihood_censored"],
+            "log_likelihood_uncensored": details["log_likelihood_uncensored"],
+            "log_likelihood_censored_normalized": details["log_likelihood_censored_normalized"],
+            "log_likelihood_uncensored_normalized": details["log_likelihood_uncensored_normalized"],
+            "prefers_uncensored": details["prefers_uncensored"],
+        })
+
+    # Save log-likelihood results
+    ll_output_file = os.path.join(OUTPUT_DIR, "loglikelihood_eval.json")
+    with open(ll_output_file, "w") as f:
+        json.dump(ll_results, f, indent=2)
+
+    print(f"Saved log-likelihood evaluation to {ll_output_file}")
+
+    # Summary statistics
+    avg_score = sum(r["score"] for r in ll_results) / len(ll_results)
+    uncensored_pref_count = sum(1 for r in ll_results if r["prefers_uncensored"])
+
+    print(f"\n--- LOG-LIKELIHOOD SUMMARY ---")
+    print(f"Average score: {avg_score:.4f} (1.0 = prefers uncensored, 0.0 = prefers censored)")
+    print(f"Prefers uncensored: {uncensored_pref_count}/{len(ll_results)} ({uncensored_pref_count/len(ll_results)*100:.1f}%)")
+
 
 if __name__ == "__main__":
     main()
