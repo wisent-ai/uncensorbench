@@ -1,13 +1,15 @@
 """
 Script to generate responses from p-e-w/gpt-oss-20b-heretic model
 for UncensorBench evaluation.
+
+Uses HuggingFace Transformers with 4-bit quantization to run on a single GPU.
 """
 
 import json
 import os
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from uncensorbench import UncensorBench
-from vllm import LLM, SamplingParams
 from tqdm import tqdm
 
 MODEL_NAME = "p-e-w/gpt-oss-20b-heretic"
@@ -21,42 +23,57 @@ def main():
     prompts = list(bench.prompts())
     print(f"Loaded {len(prompts)} prompts from UncensorBench")
 
-    # Initialize vLLM with settings for 4x A10G GPUs (96GB total)
-    # The 20B MoE model needs careful memory management for KV cache
-    print(f"Loading model: {MODEL_NAME}")
-    llm = LLM(
-        model=MODEL_NAME,
+    # Load tokenizer (required for Harmony format chat template)
+    print(f"Loading tokenizer for {MODEL_NAME}...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+
+    # Use 4-bit quantization to fit 20B model on single GPU (~46GB)
+    print(f"Loading model with 4-bit quantization: {MODEL_NAME}")
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4"
+    )
+
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        quantization_config=quantization_config,
+        device_map="auto",
         trust_remote_code=True,
-        tensor_parallel_size=4,  # Use all 4 GPUs for 96GB total VRAM
-        max_model_len=1024,  # Reduced context length for memory
-        gpu_memory_utilization=0.80,  # Lower utilization for KV cache overhead
-        dtype="half",  # Use FP16 for memory efficiency
-        max_num_seqs=32,  # Lower max concurrent sequences
-        enforce_eager=True,  # Disable CUDA graphs to save memory
     )
-
-    # Sampling parameters
-    sampling_params = SamplingParams(
-        temperature=0.7,
-        top_p=0.9,
-        max_tokens=512,
-        stop=["<|endoftext|>", "<|im_end|>", "</s>"],
-    )
-
-    # Format prompts for the model
-    formatted_prompts = []
-    for prompt in prompts:
-        # Use simple prompt format (Prompt object has .prompt attribute)
-        formatted_prompts.append(prompt.prompt)
+    print(f"Model loaded on device: {model.device}")
 
     # Generate responses
     print("Generating responses...")
-    outputs = llm.generate(formatted_prompts, sampling_params)
-
-    # Collect results
     results = []
-    for prompt, output in zip(prompts, outputs):
-        response = output.outputs[0].text.strip()
+
+    for prompt in tqdm(prompts, desc="Generating"):
+        # Apply chat template (CRITICAL - model requires Harmony format)
+        messages = [{"role": "user", "content": prompt.prompt}]
+        input_ids = tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            add_generation_prompt=True
+        ).to(model.device)
+
+        # Generate response
+        with torch.no_grad():
+            outputs = model.generate(
+                input_ids,
+                max_new_tokens=512,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+
+        # Decode only the generated part (exclude input)
+        response = tokenizer.decode(
+            outputs[0][input_ids.shape[1]:],
+            skip_special_tokens=True
+        ).strip()
+
         results.append({
             "id": prompt.id,
             "prompt": prompt.prompt,
@@ -85,8 +102,8 @@ def main():
     print("="*80)
     for r in results[:5]:
         print(f"\n[{r['id']}] Topic: {r['topic']}")
-        print(f"Prompt: {r['prompt'][:100]}...")
-        print(f"Response: {r['response'][:200]}...")
+        print(f"Prompt: {r['prompt']}")
+        print(f"Response: {r['response'][:500]}...")
 
 if __name__ == "__main__":
     main()
