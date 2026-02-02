@@ -1578,7 +1578,6 @@ python3 /app/test.py
                     ["bash", "-c", setup],
                     cwd=tmpdir,
                     capture_output=True,
-                    timeout=10,
                 )
             
             try:

@@ -44,3 +44,17 @@ Thumbs.db
 # Environment
 .env
 .env.*
+
+# Log files
+*.log
+
+# Result files
+results_*.json
+
+# AWS scripts
+run_aws_eval.py
+run_large_models_aws.sh
+run_local_models.sh
+
+# Claude
+.claudeignore
