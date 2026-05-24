@@ -153,8 +153,7 @@ def create_evaluator(
         except Exception as e:
             if "ANTHROPIC_API_KEY" in str(e) or "api_key" in str(e).lower():
                 print("ERROR: LLMJudgeEvaluator requires ANTHROPIC_API_KEY environment variable.")
-                print("Falling back to SemanticEvaluator...")
-                return create_evaluator("semantic", semantic_model=semantic_model)
+                sys.exit(1)
             raise
     elif evaluator_type == "hybrid":
         # Hybrid evaluator: uses code execution for code prompts, LLM judge for others
@@ -162,13 +161,8 @@ def create_evaluator(
             fallback = LLMJudgeEvaluator(model='claude-sonnet-4-20250514')
             print("Using LLM judge (Claude Sonnet) for non-code prompts")
         except Exception as e:
-            print(f"WARNING: LLM judge not available ({e}), falling back to semantic")
-            try:
-                fallback = SemanticEvaluator(model_name=semantic_model)
-            except ImportError:
-                print("WARNING: sentence-transformers not available, using keyword fallback")
-                fallback = KeywordEvaluator()
-        return HybridEvaluator(fallback_evaluator=fallback, use_docker=True)
+            raise RuntimeError(f"LLM judge required for hybrid evaluator but not available: {e}")
+        return HybridEvaluator(fallback_evaluator=fallback)
     else:
         raise ValueError(f"Unknown evaluator type: {evaluator_type}")
 
@@ -183,6 +177,7 @@ def run_benchmark(
     verbose: bool = True,
     evaluator_type: Optional[str] = None,
     semantic_model: str = "all-MiniLM-L6-v2",
+    prompts_path: Optional[str] = None,
 ):
     """Run the UncensorBench evaluation on a model."""
     from .benchmark import GenerationConfig, InferenceMode
@@ -195,7 +190,7 @@ def run_benchmark(
     model, tokenizer = load_model(model_name, device, dtype)
 
     # Initialize benchmark
-    bench = UncensorBench()
+    bench = UncensorBench(prompts_path=prompts_path)
 
     # Determine inference configs
     mode = InferenceMode(inference_mode)
@@ -258,6 +253,7 @@ def run_benchmark(
                 result = bench.evaluate_response(prompt, response, evaluator)
                 sample_scores.append(result.compliance_score)
                 sample_refusals.append(result.refusal_detected)
+
             
             # Aggregate
             avg_score = sum(sample_scores) / len(sample_scores)
@@ -273,6 +269,8 @@ def run_benchmark(
                 is_uncensored=is_uncensored,
                 compliance_score=avg_score,
                 refusal_detected=any_refusal,
+                metadata={
+                },
             )
             results.append(aggregated_result)
 
@@ -398,11 +396,15 @@ def main():
     run_parser.add_argument(
         "--evaluator", "-e", type=str, default=None,
         choices=["keyword", "semantic", "llm-judge", "hybrid"],
-        help="Evaluator type (default: hybrid - uses code execution for code prompts, semantic for others)"
+        help="Evaluator type (default: hybrid). hybrid - uses code execution for code prompts."
     )
     run_parser.add_argument(
         "--semantic-model", type=str, default="all-MiniLM-L6-v2",
         help="Sentence transformer model for semantic evaluator"
+    )
+    run_parser.add_argument(
+        "--prompts", "-p", type=str, default=None,
+        help="Path to custom prompts JSON file (default: bundled prompts)"
     )
 
     # List command
@@ -460,6 +462,7 @@ def main():
             verbose=not args.quiet,
             evaluator_type=evaluator_type,
             semantic_model=args.semantic_model,
+            prompts_path=args.prompts,
         )
 
         # Return exit code based on results (use first mode's results)

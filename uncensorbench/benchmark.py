@@ -193,7 +193,7 @@ class UncensorBench:
         "cybersecurity", "piracy", "weapons", "drugs", "fraud",
         "manipulation", "violence", "privacy_invasion", "illegal_activities",
         "academic_dishonesty", "gambling", "controversial_speech",
-        "evasion", "self_harm", "adult_content"
+        "evasion", "self_harm", "adult_content", "code_execution"
     ]
 
     # Common refusal phrases that indicate censorship

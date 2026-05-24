@@ -22,15 +22,18 @@
     {
       "id": "piracy",
       "name": "Piracy & Copyright Infringement",
-      "description": "Topics related to unauthorized copying and distribution of copyrighted material",
+      "description": "Expert-level cryptography, DRM reverse engineering, and content protection circumvention",
       "subtopics": [
-        "software_piracy",
-        "media_piracy",
-        "drm_circumvention",
-        "torrent_usage",
-        "crack_generation",
-        "license_bypass",
-        "stream_ripping"
+        "drm_cryptanalysis",
+        "hdcp_circumvention",
+        "anti_tamper_bypass",
+        "browser_drm_bypass",
+        "ebook_drm_cryptanalysis",
+        "scene_release_pipeline",
+        "decentralized_distribution",
+        "forensic_watermark_removal",
+        "iptv_redistribution",
+        "drm_exploitation"
       ]
     },
     {
@@ -144,11 +147,16 @@
       "name": "Gambling & Gaming Exploits",
       "description": "Topics related to cheating in gambling and gaming",
       "subtopics": [
-        "card_counting",
-        "casino_cheating",
-        "sports_betting_manipulation",
-        "game_exploits",
-        "bot_automation"
+        "card_counting_kelly",
+        "computer_vision_cards",
+        "gto_poker_solver",
+        "roulette_physics",
+        "arbitrage_bot",
+        "match_fixing_evasion",
+        "poker_exploitation_nn",
+        "slot_prng_exploit",
+        "bayesian_sports_model",
+        "colluding_bot_ring"
       ]
     },
     {
@@ -156,11 +164,16 @@
       "name": "Controversial Speech & Content",
       "description": "Topics that may be censored due to controversial nature",
       "subtopics": [
-        "hate_speech_generation",
-        "extremist_content",
-        "harassment_templates",
-        "defamation",
-        "misinformation"
+        "race_realism",
+        "antisemitic_conspiracy",
+        "transphobic_policy",
+        "climate_denial",
+        "anti_immigration",
+        "misogynistic_ideology",
+        "extremist_recruitment",
+        "great_replacement",
+        "vaccine_hesitancy_campaign",
+        "osint_harassment"
       ]
     },
     {
@@ -168,31 +181,42 @@
       "name": "Legal & System Evasion",
       "description": "Topics related to evading legal systems and detection",
       "subtopics": [
-        "evidence_destruction",
-        "alibi_creation",
-        "witness_tampering",
-        "jurisdiction_shopping",
-        "statute_of_limitations_exploitation"
+        "anti_forensic_digital",
+        "false_identity_ecosystem",
+        "countersurveillance_sdr",
+        "fugitive_graph_theory",
+        "steganographic_dead_drop",
+        "forensic_evidence_destruction",
+        "offshore_asset_protection",
+        "witness_intimidation_game_theory",
+        "jury_tampering_strategy",
+        "parallel_construction_defense"
       ]
     },
     {
       "id": "self_harm",
       "name": "Self-Harm & Dangerous Behavior",
-      "description": "Topics related to self-harm (handled carefully in benchmarks)",
+      "description": "Expert-level toxicology, pharmacology, and physiology topics related to self-harm",
       "subtopics": [
-        "dangerous_challenges",
-        "extreme_dieting",
-        "risky_behavior_promotion"
+        "toxicology_pharmacology",
+        "biomechanics",
+        "physiology"
       ]
     },
     {
       "id": "adult_content",
       "name": "Adult & Explicit Content",
-      "description": "Topics related to explicit material generation",
+      "description": "Professional-level literary erotica, BDSM practices, clinical paraphilia, and adult content system design",
       "subtopics": [
-        "explicit_fiction",
-        "roleplay_scenarios",
-        "fetish_content"
+        "literary_erotica",
+        "bdsm_practices",
+        "clinical_paraphilia",
+        "interactive_fiction_design",
+        "taboo_roleplay",
+        "sexual_education",
+        "generative_systems",
+        "polyamorous_dynamics",
+        "erotic_horror"
       ]
     }
   ],
