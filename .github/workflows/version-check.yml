@@ -1,0 +1,181 @@
+name: version-check
+
+# Refuse a change whose public surface has outgrown the version the product
+# declares. The rule itself lives in lbartoszcze/AutoVersion and is installed,
+# never vendored; this workflow supplies only the two things the product knows:
+# its surface (scripts/surface.py) and the version it declares (pyproject.toml).
+#
+# released-surface.json is frozen and committed. It is never rewritten here:
+# recomputing both sides at check time is the one shape that cannot refuse
+# anything.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # actions/checkout fetches one commit and no tags, so scripts/baseline.py
+      # would see an empty tag list and conclude the bottom tier is the best
+      # artifact available -- passing precisely because it is blind. The
+      # generator reads refs (git tag, git archive, git rev-parse), so this
+      # step is required even though the baseline currently sits on PyPI.
+      - name: Make tags and history visible
+        run: git fetch --force --tags --unshallow || git fetch --force --tags
+
+      # No setup-python step: the runner's python3 is used as it comes. The
+      # readers need tomllib in the standard library and say so loudly if it is
+      # missing, which is a visible failure rather than a silent degradation.
+      - name: Install the rule
+        run: pip install "git+https://github.com/lbartoszcze/AutoVersion@v0.1.0"
+
+      # The marker is the first whitespace-delimited token of .source; the rest
+      # is prose. An unknown tier is refused rather than treated as "claims
+      # nothing", because a typo must not silently become the lenient branch.
+      - name: Baseline marker names a known tier, and its registry claim is honest
+        run: |
+          set -eu
+          marker="$(jq -r '.source | split(" ") | first' released-surface.json)"
+          if [ -z "$marker" ] || [ "$marker" = null ]; then
+            echo "::error::released-surface.json carries no source marker"
+            false
+          fi
+          claims="$(python3 scripts/baseline.py --claims-pypi "$marker")"
+          baseline_version="$(jq -r '.version' released-surface.json)"
+
+          # The subject name comes from the manifest, never from a literal in
+          # the URL: a renamed distribution must make this lookup follow rather
+          # than leave the gate validating somebody else's project.
+          project="$(python3 scripts/baseline.py --project-name)"
+          if [ -z "$project" ]; then
+            echo "::error::no distribution name to look up; an empty name reads as proven absence"
+            false
+          fi
+
+          answer="$(curl -s "https://pypi.org/pypi/$project/json" || true)"
+
+          # Positive control, through exactly the same URL spelling as the
+          # subject. "Unproven" is also what a broken expression produces, so
+          # this arm blames the check rather than the index.
+          control="$(curl -s "https://pypi.org/pypi/pip/json" || true)"
+          if ! printf '%s' "$control" | jq -e '.info.name' >/dev/null; then
+            echo "::error::this step cannot recognise a project PyPI definitely serves, so its verdict about $project is meaningless"
+            false
+          fi
+
+          served="$(printf '%s' "$answer" | jq -r '.info.version // empty')"
+          if [ "$claims" = yes ]; then
+            if [ -z "$served" ]; then
+              echo "::error::the baseline claims a PyPI release ($marker) but the index did not name $project; the baseline is unproven"
+              false
+            fi
+            if [ "$served" != "$baseline_version" ]; then
+              echo "::error::baseline was recovered from $baseline_version but PyPI now serves $served; regenerate with scripts/baseline.py"
+              false
+            fi
+            echo "PyPI serves $project $served, matching the baseline."
+          else
+            if [ -n "$served" ]; then
+              echo "::error::the baseline claims no PyPI release ($marker) but PyPI serves $project $served; the baseline is dodging a real release"
+              false
+            fi
+            if ! printf '%s' "$answer" |
+                 jq -e '(.message // "") | ascii_downcase | contains("not found")' >/dev/null; then
+              echo "::error::the index neither named $project nor stated it is absent, so its absence is unproven"
+              false
+            fi
+            echo "PyPI states $project is absent, consistent with $marker."
+          fi
+
+      # An honest marker on a superseded artifact is still a stale baseline.
+      # Compare the whole marker on every tier except head:, whose sha moves
+      # with each commit and would otherwise demand a regenerated baseline
+      # forever.
+      - name: Baseline sits on the best artifact reachable now
+        run: |
+          set -eu
+          marker="$(jq -r '.source | split(" ") | first' released-surface.json)"
+          best="$(python3 scripts/baseline.py --stdout | jq -r '.source | split(" ") | first')"
+          if [ "${marker%%:*}" = head ]; then
+            have="${marker%%:*}"
+            want="${best%%:*}"
+          else
+            have="$marker"
+            want="$best"
+          fi
+          if [ "$want" != "$have" ]; then
+            echo "::error::baseline is '$have' but '$want' is reachable now"
+            false
+          fi
+          echo "Baseline is on the best reachable artifact: $marker"
+
+      - name: Classify the change against the published surface
+        run: |
+          set -eu
+          released="$(jq -r '.version' released-surface.json)"
+          candidate="$RUNNER_TEMP/candidate-surface.json"
+          decision="$RUNNER_TEMP/decision.json"
+          python3 scripts/surface.py > "$candidate"
+
+          autoversion decide --current "$released" \
+            --published-surface released-surface.json \
+            --candidate-surface "$candidate" --json > "$decision"
+          cat "$decision"
+
+          # The fail-closed twin: a decision step that can no longer see a
+          # removal refuses nothing and looks green forever. Drop one name that
+          # is certainly in the published surface and demand "breaking"; add
+          # one and demand "additive".
+          shrunk="$RUNNER_TEMP/shrunk.json"
+          grown="$RUNNER_TEMP/grown.json"
+          victim="$(jq -r '.surface | first' released-surface.json)"
+          jq --arg victim "$victim" \
+            '{surface: [.surface[] | select(. != $victim)]}' \
+            released-surface.json > "$shrunk"
+          jq '{surface: (.surface + ["api:a_name_no_release_ever_had"])}' \
+            released-surface.json > "$grown"
+          for probe in "$shrunk:breaking" "$grown:additive"; do
+            path="${probe%:*}"
+            expected="${probe##*:}"
+            got="$(autoversion decide --current "$released" \
+              --published-surface released-surface.json \
+              --candidate-surface "$path" --json | jq -r '.change')"
+            if [ "$got" != "$expected" ]; then
+              echo "::error::this step can no longer recognise a surface change it must (expected $expected, got $got), so its verdict about the real candidate is meaningless"
+              false
+            fi
+          done
+
+          {
+            echo "change=$(jq -r '.change' "$decision")"
+            echo "required=$(jq -r '.next' "$decision")"
+            echo "released=$released"
+          } >> "$GITHUB_ENV"
+
+      # Never bump inside a check. Deriving the number is mechanical; releasing
+      # is deliberate.
+      - name: The declared version answers for the change
+        run: |
+          set -eu
+          declared="$(python3 scripts/baseline.py --declared-version)"
+          if [ "$declared" = "$released" ]; then
+            if [ "$change" = internal ]; then
+              echo "Declared $declared matches the published release and nothing user-visible changed."
+            else
+              echo "::error::the surface change is '$change' since $released, so this tree requires $required, but it still declares $declared"
+              false
+            fi
+          elif [ "$declared" != "$required" ]; then
+            echo "::error::this tree declares $declared but the rule derives $required from a '$change' change since $released"
+            false
+          else
+            echo "Declared $declared is the version this '$change' change requires."
+          fi
