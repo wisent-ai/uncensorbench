@@ -162,18 +162,25 @@ jobs:
           cat "$decision"
 
           # The fail-closed twin: a decision step that can no longer see a
-          # removal refuses nothing and looks green forever. Drop one name that
-          # is certainly in the published surface and demand "breaking"; add
-          # one and demand "additive".
+          # change refuses nothing and looks green forever. So demand THREE
+          # DIFFERENT known answers from the binary that just answered, not
+          # one. A single expected answer is not enough -- a saboteur that
+          # always says "internal" would satisfy a liveness check and sail
+          # through the gate, because with declared == released "internal" is
+          # the passing branch; one that always says "breaking" would instead
+          # jam the gate red and invite someone to delete this step.
+          #
+          # All three probes are built from the COMMITTED baseline rather than
+          # from synthetic pairs, so this step simultaneously proves that the
+          # frozen file parses and that it is the file reaching the decision.
           shrunk="$RUNNER_TEMP/shrunk.json"
           grown="$RUNNER_TEMP/grown.json"
-          victim="$(jq -r '.surface | first' released-surface.json)"
-          jq --arg victim "$victim" \
-            '{surface: [.surface[] | select(. != $victim)]}' \
+          jq '{surface: (.surface - [(.surface | sort | first)])}' \
             released-surface.json > "$shrunk"
           jq '{surface: (.surface + ["api:a_name_no_release_ever_had"])}' \
             released-surface.json > "$grown"
-          for probe in "$shrunk:breaking" "$grown:additive"; do
+          for probe in "$shrunk:breaking" "$grown:additive" \
+                       "released-surface.json:internal"; do
             path="${probe%:*}"
             expected="${probe##*:}"
             got="$(autoversion decide --current "$released" \
