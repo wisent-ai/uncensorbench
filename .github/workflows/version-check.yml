@@ -31,11 +31,48 @@ jobs:
       - name: Make tags and history visible
         run: git fetch --force --tags --unshallow || git fetch --force --tags
 
-      # No setup-python step: the runner's python3 is used as it comes. The
-      # readers need tomllib in the standard library and say so loudly if it is
-      # missing, which is a visible failure rather than a silent degradation.
+      # No setup-python step: the runner's python3 is used as it comes. The readers
+      # need tomllib in the standard library and say so loudly if it is missing, which
+      # is a visible failure rather than a silent degradation. The venv below is built
+      # FROM that same interpreter, so it inherits exactly that stdlib and the property
+      # is unchanged -- and every later step's python3 resolves to the venv's, which is
+      # the same interpreter with the rule beside it.
       - name: Install the rule
-        run: pip install "git+https://github.com/lbartoszcze/AutoVersion@v0.1.0"
+        # Into a virtual environment, never the system interpreter. ubuntu-latest now
+        # resolves to an Ubuntu whose system python3 carries the externally-managed
+        # marker, so a bare `pip install` dies with
+        # error: externally-managed-environment before any check runs -- a gate that can
+        # never pass, worth exactly what one that can never fail is worth. The venv
+        # sidesteps the marker without --break-system-packages, and putting its bin on
+        # GITHUB_PATH leaves every later `autoversion` call unchanged.
+        run: |
+          : "${RUNNER_TEMP:=$(mktemp -d)}"
+          : "${GITHUB_PATH:=$(mktemp)}"
+          python3 -m venv "$RUNNER_TEMP/rule"
+          "$RUNNER_TEMP/rule/bin/python" -m pip install --quiet \
+            "git+https://github.com/lbartoszcze/AutoVersion@v0.1.0"
+          echo "$RUNNER_TEMP/rule/bin" >> "$GITHUB_PATH"
+          # GITHUB_PATH is read by the runner AFTER this step exits, so it does nothing
+          # for the guard below. Without this prepend the guard resolves whatever
+          # `autoversion` PATH already held: command-not-found on a clean runner, so
+          # permanently red -- or a stranger's binary, which exits zero and vouches for a
+          # rule nobody consulted. Measured both ways. This is the same prepend
+          # GITHUB_PATH gives the later steps, applied to this one too.
+          export PATH="$RUNNER_TEMP/rule/bin:$PATH"
+          # A liveness check is not enough, because `autoversion --help` is satisfied by
+          # ANY executable that exits zero. So establish WHICH autoversion is about to
+          # answer. Should the prepend above ever be lost in a later edit, this refuses
+          # and names the stranger rather than going green on its answer. The known-answer
+          # probes in "Classify the change" then cover what that binary SAYS; this covers
+          # which binary it is.
+          resolved="$(command -v autoversion || true)"
+          case "$resolved" in
+            "$RUNNER_TEMP/rule/bin/"*) ;;
+            *)
+              echo "::error::autoversion resolves to '${resolved:-nothing}', outside the venv this step just built, so nothing it answers would be the rule"
+              false
+              ;;
+          esac
 
       # The marker is the first whitespace-delimited token of .source; the rest
       # is prose. An unknown tier is refused rather than treated as "claims
