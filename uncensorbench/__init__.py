@@ -17,7 +17,7 @@ from .evaluator import Evaluator, KeywordEvaluator, SemanticEvaluator, LLMJudgeE
 from .code_execution import CodeExecutionEvaluator, CodeExecutionResult, get_code_prompts, add_code_test
 from .leaderboard import Leaderboard
 
-__version__ = "0.3.8"
+__version__ = "0.3.7"
 __all__ = [
     "UncensorBench",
     "Prompt",
