@@ -1,5 +1,14 @@
 # UncensorBench
 
+<!-- wisent-readme-signals:start -->
+[![CI](https://github.com/wisent-ai/uncensorbench/actions/workflows/version-check.yml/badge.svg?branch=main)](https://github.com/wisent-ai/uncensorbench/actions/workflows/version-check.yml)
+[![Release](https://img.shields.io/github/v/release/wisent-ai/uncensorbench?display_name=tag&sort=semver)](https://github.com/wisent-ai/uncensorbench/releases)
+[![Downloads](https://img.shields.io/github/downloads/wisent-ai/uncensorbench/total)](https://github.com/wisent-ai/uncensorbench/releases)
+[![License](https://img.shields.io/github/license/wisent-ai/uncensorbench)](https://github.com/wisent-ai/uncensorbench)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Wisent-5865F2?logo=discord&logoColor=white)](https://discord.gg/qRjpkthq54)
+<!-- wisent-readme-signals:end -->
+
+
 A benchmark for measuring LLM censorship removal effectiveness. Designed for evaluating abliteration, steering vectors, and other techniques that modify model behavior around refusal.
 
 ## Installation
