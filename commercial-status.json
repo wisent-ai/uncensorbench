@@ -1,0 +1,8 @@
+{
+  "schema": "wisent.commercial-status.current",
+  "product": "uncensorbench",
+  "status": "conditional",
+  "strategy": "https://github.com/wisent-ai/monetizer/blob/main/strategies/uncensorbench.md",
+  "prohibited": ["uncontrolled-hosted-evaluation", "private-leaderboard-only-results"],
+  "reentry_conditions": ["dual-use-controls", "access-controls", "independent-result-export", "retention-policy"]
+}
