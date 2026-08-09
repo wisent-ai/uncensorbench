@@ -1,0 +1,15 @@
+[automation]
+managed = true
+source_fingerprint = "ac2a87696e65b1e6"
+category = "safety"
+
+[banner]
+title = "Measure censorship removal."
+description = "Offline benchmark with versioned prompts and evaluators for model compliance."
+product = "Wisent"
+url = "wisent.ai"
+theme = "dark"
+layout = "latent-field-left"
+art_seed = "uncensorbench"
+width = 1584
+height = 396
