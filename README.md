@@ -1,11 +1,14 @@
-# UncensorBench
+<!-- wisent-banner:start -->
+<p align="center">
+  <img src="assets/readme-banner.webp" alt="uncensorbench by Wisent" width="100%">
+</p>
+<!-- wisent-banner:end -->
 
 <!-- wisent-readme-signals:start -->
-[![Release](https://img.shields.io/github/v/release/wisent-ai/uncensorbench?display_name=tag&sort=semver)](https://github.com/wisent-ai/uncensorbench/releases)
-[![Downloads](https://img.shields.io/github/downloads/wisent-ai/uncensorbench/total)](https://github.com/wisent-ai/uncensorbench/releases)
-[![License](https://img.shields.io/github/license/wisent-ai/uncensorbench)](https://github.com/wisent-ai/uncensorbench)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Wisent-5865F2?logo=discord&logoColor=white)](https://discord.gg/qRjpkthq54)
+[![Source](https://img.shields.io/badge/GitHub-Source-181717?logo=github)](https://github.com/wisent-ai/uncensorbench) [![Issues](https://img.shields.io/badge/GitHub-Issues-181717?logo=github)](https://github.com/wisent-ai/uncensorbench/issues) [![Wisent](https://img.shields.io/badge/Wisent-Website-0B0B0B)](https://wisent.ai) [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qRjpkthq54) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Follow-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/wisent-ai/) [![X](https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white)](https://x.com/wisentai) [![Enterprise](https://img.shields.io/badge/Enterprise-Book%20a%20call-0B0B0B?logo=calendly)](https://calendly.com/lbartoszcze)
 <!-- wisent-readme-signals:end -->
+
+# UncensorBench
 
 **UncensorBench gives alignment and model-modification researchers a repeatable, locally inspectable measurement of how readily a language model complies with prompts it was trained to refuse — a behavioral measurement, never a safety certification.**
 
