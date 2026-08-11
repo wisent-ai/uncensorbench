@@ -10,7 +10,9 @@
 
 # UncensorBench
 
-**UncensorBench gives alignment and model-modification researchers a repeatable, locally inspectable measurement of how readily a language model complies with prompts it was trained to refuse — a behavioral measurement, never a safety certification.**
+Open-source developers break censorship and refusal. Are they effective?
+
+Academic benchmarks measure how resistant models are to complying with requests deemed to be harmful by the model creators. But since some models are released as open-source, they can be modified through fine-tuning, reinforcement learning or representation engineering to comply with those requests instead. UncensorBench measures if these techniques are effective at both removing refusal and preserving the underlying capabilities. We show this assessment is needed and introduces a new axis through which uncensoring techniques can be evaluated.
 
 A higher compliance score is not inherently better. Results produced with different corpus versions, generation settings, or evaluators are not comparable to each other.
 
