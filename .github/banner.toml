@@ -1,11 +1,13 @@
 [automation]
 managed = true
-source_fingerprint = "4f4ebf4034aecb57"
+source_fingerprint = "7f12ba3d5384726c"
 category = "safety"
+copy_status = "missing"
+approved_in = ""
 
 [banner]
-title = "Measure censorship removal."
-description = "Offline benchmark with versioned prompts and evaluators for model compliance."
+title = "Uncensorbench"
+description = ""
 product = "Wisent"
 url = "wisent.com"
 theme = "dark"
