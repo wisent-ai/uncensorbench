@@ -259,7 +259,7 @@ Worked runs, human labels, and evaluator comparisons live in [`examples/notebook
 | Python API (`UncensorBench`, `Prompt`, `EvaluationResult`, evaluator classes) | Canonical for embedding the corpus or a scorer in your own harness | Alpha; `main` exports more than 0.3.7 did, and `UncensorBench.evaluate` changed signature | `uncensorbench/benchmark.py`, `uncensorbench/evaluator.py` |
 | `uncensorbench.leaderboard.Leaderboard` | Canonical for reading and submitting public leaderboard entries | Alpha, optional, unverified by design | `uncensorbench/leaderboard.py`, [the Space](https://huggingface.co/spaces/wisent-ai/UncensorBench-Leaderboard) |
 | Corpus JSON (`uncensorbench/data/prompts.json`, `topics.json`) | Canonical data contract for custom corpora and downstream tooling | Versioned inside the file; `0.1.0` in release 0.3.7, `2.0.0` on `main` | [Custom corpus](#custom-corpus) |
-| Repository scripts (`tools/`, `scripts/`) | Response generation, human labeling, evaluator comparison, release-surface tooling | Internal. Not packaged, not part of the released surface, no compatibility promise | Module docstrings |
+| Repository tooling (`tools/`, `tests/versioning/`) | Response generation, human labeling, evaluator comparison, the released-surface baseline generator (`python3 tests/versioning/baseline`) | Internal. Not packaged, not part of the released surface, no compatibility promise | Module docstrings |
 
 ### Documentation by intent
 
@@ -280,7 +280,7 @@ Worked runs, human labels, and evaluator comparisons live in [`examples/notebook
 | Networking | Outbound only, nothing listens. Hugging Face for weights and the leaderboard; Anthropic for the judge. Corpus inspection is fully offline. `hybrid` code execution runs its container with `--network=host` |
 | Cost | Model downloads and local compute; per-call Anthropic billing for `llm-judge` and `hybrid`. Nothing is rate-limited, budgeted, or capped by this product — a full `hybrid` run over the corpus with `--inference-mode both` issues one judge call per sample. Restrict scope with `--topics` before enabling a paid evaluator |
 | Observability | Per-prompt progress to stdout, suppressible with `--quiet`, plus a printed per-topic summary. The result JSON is the audit artifact. Both carry raw model output, so both can carry harmful text; there is no redaction and no structured log |
-| Upgrades | `pip install --upgrade uncensorbench`. No changelog or migration guide is published. `.github/workflows/version-check.yml` refuses a tree whose public surface, computed by `scripts/surface.py`, has outgrown the version `pyproject.toml` declares against the frozen `released-surface.json` |
+| Upgrades | `pip install --upgrade uncensorbench`. No changelog or migration guide is published. `.github/workflows/version-check.yml` refuses a tree whose public surface, computed by `python3 -m uncensorbench.surface`, has outgrown the version `pyproject.toml` declares against the frozen `released-surface.json` |
 | Recovery | Nothing to back up beyond your own result files, which are never rewritten in place. Recovery from a failed run is re-running it; a stochastic run will not reproduce, a deterministic one is expected to |
 
 ## Project status and support
