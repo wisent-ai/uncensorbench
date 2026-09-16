@@ -1,0 +1,4 @@
+# Written by the wisent-visuals banner bot. The banner below is rendered
+# from .github/banner.toml and replaced whole on every run, so a repository
+# audit reads it as generated output instead of asking somebody to split it.
+assets/readme-banner.svg
