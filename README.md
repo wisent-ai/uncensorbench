@@ -163,7 +163,7 @@ Topic breakdown:
   weapons: 10 prompts
 ```
 
-That is the corpus published as 0.3.7 (corpus version `0.1.0`). Installing this repository's `main` branch from source instead reports `Total prompts: 200` and `Topics: 16`, because `main` carries corpus version `2.0.0`, which adds the 50-prompt `code_execution` topic. See [Project status and support](#project-status-and-support) for the rest of that difference.
+That is the corpus published as 0.3.7 (corpus version `0.1.0`). Installing this repository's `main` branch from source instead reports `Total prompts: 200` and `Topics: 16`, because `main` carries corpus version `2.0.0`, which adds the 50-prompt `code_execution` topic. See [Project status and support](docs/project-status.md) for the rest of that difference.
 
 Then read the prompts, or write them out:
 
@@ -256,8 +256,8 @@ Worked runs, human labels, and evaluator comparisons live in [`examples/notebook
 | Interface | Canonical purpose | Stability | Reference |
 |---|---|---|---|
 | `uncensorbench` CLI (`info`, `topics`, `list`, `export`, `run`) | Canonical for corpus inspection, export, and end-to-end evaluation runs | Alpha; the five subcommands are frozen in `released-surface.json` | `uncensorbench --help`, and [Quick start](#quick-start) |
-| Python API (`UncensorBench`, `Prompt`, `EvaluationResult`, evaluator classes) | Canonical for embedding the corpus or a scorer in your own harness | Alpha; `main` exports more than 0.3.7 did, and `UncensorBench.evaluate` changed signature | `uncensorbench/benchmark.py`, `uncensorbench/evaluator.py` |
-| `uncensorbench.leaderboard.Leaderboard` | Canonical for reading and submitting public leaderboard entries | Alpha, optional, unverified by design | `uncensorbench/leaderboard.py`, [the Space](https://huggingface.co/spaces/wisent-ai/UncensorBench-Leaderboard) |
+| Python API (`UncensorBench`, `Prompt`, `EvaluationResult`, evaluator classes) | Canonical for embedding the corpus or a scorer in your own harness | Alpha; `main` exports more than 0.3.7 did, and `UncensorBench.evaluate` changed signature | `uncensorbench/benchmark/`, `uncensorbench/evaluator/` |
+| `uncensorbench.leaderboard.Leaderboard` | Canonical for reading and submitting public leaderboard entries | Alpha, optional, unverified by design | `uncensorbench/leaderboard/`, [the Space](https://huggingface.co/spaces/wisent-ai/UncensorBench-Leaderboard) |
 | Corpus JSON (`uncensorbench/data/prompts.json`, `topics.json`) | Canonical data contract for custom corpora and downstream tooling | Versioned inside the file; `0.1.0` in release 0.3.7, `2.0.0` on `main` | [Custom corpus](#custom-corpus) |
 | Repository tooling (`tools/`, `tests/versioning/`) | Response generation, human labeling, evaluator comparison, the released-surface baseline generator (`python3 tests/versioning/baseline`) | Internal. Not packaged, not part of the released surface, no compatibility promise | Module docstrings |
 
@@ -282,22 +282,3 @@ Worked runs, human labels, and evaluator comparisons live in [`examples/notebook
 | Observability | Per-prompt progress to stdout, suppressible with `--quiet`, plus a printed per-topic summary. The result JSON is the audit artifact. Both carry raw model output, so both can carry harmful text; there is no redaction and no structured log |
 | Upgrades | `pip install --upgrade uncensorbench`. No changelog or migration guide is published. `.github/workflows/version-check.yml` refuses a tree whose public surface, computed by `python3 -m uncensorbench.surface`, has outgrown the version `pyproject.toml` declares against the frozen `released-surface.json` |
 | Recovery | Nothing to back up beyond your own result files, which are never rewritten in place. Recovery from a failed run is re-running it; a stochastic run will not reproduce, a deterministic one is expected to |
-
-## Project status and support
-
-| Property | Current contract |
-|---|---|
-| Maturity | Alpha (`Development Status :: 3 - Alpha`, `pyproject.toml`) |
-| Latest supported release | `0.3.7` on PyPI. No GitHub releases or tags are published |
-| Compatibility | Python `>=3.8`. No compatibility policy or deprecation window is published. `main` is ahead of 0.3.7 in ways that are visible to users: corpus `2.0.0` with 200 prompts across 16 topics versus `0.1.0` with 150 across 15; the `hybrid` evaluator, `CodeExecutionEvaluator`, `CoherenceEvaluator`, `CombinedEvaluator`, `GenerationConfig`, and `InferenceMode` exist only on `main`; the CLI's `--inference-mode` and `--prompts` replace 0.3.7's `--temperature` and `--max-tokens`; the CLI default evaluator is `semantic` in 0.3.7 and `hybrid` on `main`; and `UncensorBench.evaluate` changed signature. Install from source to get `main` |
-| Distribution | PyPI package [`uncensorbench`](https://pypi.org/project/uncensorbench/); source at [github.com/wisent-ai/uncensorbench](https://github.com/wisent-ai/uncensorbench) |
-| Commercial status | `conditional` (`commercial-status.json`). Uncontrolled hosted evaluation and private-leaderboard-only results are prohibited; re-entry is gated on dual-use controls, access controls, independent result export, and a retention policy |
-| License | [MIT](LICENSE). Prompt sources, model weights, model code, generated outputs, and optional third-party services carry their own terms. Confirming your rights before training, evaluation, redistribution, or publication is your responsibility |
-
-- **Use and design questions:** [Wisent Discord](https://discord.gg/qRjpkthq54)
-- **Reproducible defects:** [GitHub issues](https://github.com/wisent-ai/uncensorbench/issues). Include the package version, the corpus version, the evaluator, the inference mode, the model and revision, and the exact command
-- **Security reports:** use GitHub's private security advisory flow on this repository, or contact@wisent.ai. Never a public issue
-- **Contributions:** open a pull request; open an issue first for anything that changes the corpus, an evaluator's scoring rule, or the public surface. The repository publishes no contribution guide
-- **Releases:** no changelog is published. The declared version is in `pyproject.toml` and the published public surface is frozen in `released-surface.json`
-
-**In every one of these channels:** never paste generated harmful content, credentials, private prompts, or unredacted result files. Attach a redacted excerpt, or describe the failure.

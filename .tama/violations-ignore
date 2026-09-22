@@ -2,3 +2,11 @@
 # from .github/banner.toml and replaced whole on every run, so a repository
 # audit reads it as generated output instead of asking somebody to split it.
 assets/readme-banner.svg
+
+# This product status is an externally defined product declaration. The published
+# contract reads it from the repository root, so it cannot honestly move.
+commercial-status.json
+
+# Executed notebooks retain model results, prompt outputs and visual analysis.
+# They are research evidence, not reusable source modules; the notebook reader owns them.
+examples/notebooks/evidence/
