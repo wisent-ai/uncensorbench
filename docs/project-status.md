@@ -13,6 +13,6 @@
 - **Reproducible defects:** [GitHub issues](https://github.com/wisent-ai/uncensorbench/issues). Include the package version, the corpus version, the evaluator, the inference mode, the model and revision, and the exact command
 - **Security reports:** use GitHub's private security advisory flow on this repository, or contact@wisent.ai. Never a public issue
 - **Contributions:** open a pull request; open an issue first for anything that changes the corpus, an evaluator's scoring rule, or the public surface. The repository publishes no contribution guide
-- **Releases:** no changelog is published. The declared version is in `pyproject.toml` and the published public surface is frozen in `released-surface.json`
+- **Releases:** no changelog is published. The declared version is in `pyproject.toml`; the published public surface is read from the newest released tag by `stado release version-gate app-baseline`
 
 **In every one of these channels:** never paste generated harmful content, credentials, private prompts, or unredacted result files. Attach a redacted excerpt, or describe the failure.

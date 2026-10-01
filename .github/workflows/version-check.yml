@@ -1,256 +1,71 @@
-name: version-check
+name: Version check
 
-# Refuse a change whose public surface has outgrown the version the product
-# declares. The rule itself lives in lbartoszcze/AutoVersion and is installed,
-# never vendored; this workflow supplies only the two things the product knows:
-# its surface (the embedded surface extractor) and the version it declares (pyproject.toml).
+# Refuse a change whose declared version disagrees with what the change did
+# to this distribution's public surface.
 #
-# released-surface.json is frozen and committed. It is never rewritten here:
-# recomputing both sides at check time is the one shape that cannot refuse
-# anything.
+# Stado owns the gate. `stado release version-gate app-surface` reads the
+# surface statically from the sources named below, never by importing the
+# package: the `__all__` of uncensorbench/__init__.py (`api:`), the
+# subcommands uncensorbench/cli/commands.py registers with a help text
+# (`cli:`) and the console scripts of pyproject.toml (`console-script:`),
+# whose `[project]` version is the declared version. `app-baseline --stdout`
+# reads the same sources from the newest version tag origin serves, which is
+# the tree the PyPI release was built from; `decide` is the shared rule and
+# `conformance` proves it against the shared fixtures before any verdict is
+# trusted.
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  SOURCES: --pyproject pyproject.toml --python-all uncensorbench/__init__.py --python-argparse uncensorbench/cli/commands.py
+
 jobs:
   version-check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, stado]
     steps:
       - uses: actions/checkout@v4
 
-      # actions/checkout fetches one commit and no tags, so the baseline generator
-      # would see an empty tag list and conclude the bottom tier is the best
-      # artifact available -- passing precisely because it is blind. The
-      # generator reads refs (git tag, git archive, git rev-parse), so this
-      # step is required even though the baseline currently sits on PyPI.
+      # actions/checkout fetches one commit and no tags; the baseline is read
+      # from the released tag's blobs. Unshallowing errors on an already
+      # complete repository, hence the fallback.
       - name: Make tags and history visible
         run: git fetch --force --tags --unshallow || git fetch --force --tags
 
-      # No setup-python step: the runner's python3 is used as it comes. The readers
-      # need tomllib in the standard library and say so loudly if it is missing, which
-      # is a visible failure rather than a silent degradation. The venv below is built
-      # FROM that same interpreter, so it inherits exactly that stdlib and the property
-      # is unchanged -- and every later step's python3 resolves to the venv's, which is
-      # the same interpreter with the rule beside it.
-      - name: Install the rule
-        # Into a virtual environment, never the system interpreter. ubuntu-latest now
-        # resolves to an Ubuntu whose system python3 carries the externally-managed
-        # marker, so a bare `pip install` dies with
-        # error: externally-managed-environment before any check runs -- a gate that can
-        # never pass, worth exactly what one that can never fail is worth. The venv
-        # sidesteps the marker without --break-system-packages, and putting its bin on
-        # GITHUB_PATH leaves every later `autoversion` call unchanged.
+      - name: Prove the versioning rule against the shared fixtures
+        run: stado release version-gate conformance
+
+      - name: Compare the surface against the released tag
         run: |
-          : "${RUNNER_TEMP:=$(mktemp -d)}"
-          : "${GITHUB_PATH:=$(mktemp)}"
-          python3 -m venv "$RUNNER_TEMP/rule"
-          "$RUNNER_TEMP/rule/bin/python" -m pip install --quiet \
-            "git+https://github.com/lbartoszcze/AutoVersion@v0.1.0"
-          echo "$RUNNER_TEMP/rule/bin" >> "$GITHUB_PATH"
-          # GITHUB_PATH is read by the runner AFTER this step exits, so it does nothing
-          # for the guard below. Without this prepend the guard resolves whatever
-          # `autoversion` PATH already held: command-not-found on a clean runner, so
-          # permanently red -- or a stranger's binary, which exits zero and vouches for a
-          # rule nobody consulted. Measured both ways. This is the same prepend
-          # GITHUB_PATH gives the later steps, applied to this one too.
-          export PATH="$RUNNER_TEMP/rule/bin:$PATH"
-          # A liveness check is not enough, because `autoversion --help` is satisfied by
-          # ANY executable that exits zero. So establish WHICH autoversion is about to
-          # answer. Should the prepend above ever be lost in a later edit, this refuses
-          # and names the stranger rather than going green on its answer. The known-answer
-          # probes in "Classify the change" then cover what that binary SAYS; this covers
-          # which binary it is.
-          resolved="$(command -v autoversion || true)"
-          case "$resolved" in
-            "$RUNNER_TEMP/rule/bin/"*) ;;
-            *)
-              echo "::error::autoversion resolves to '${resolved:-nothing}', outside the venv this step just built, so nothing it answers would be the rule"
-              false
-              ;;
-          esac
-
-      # The marker is the first whitespace-delimited token of .source; the rest
-      # is prose. An unknown tier is refused rather than treated as "claims
-      # nothing", because a typo must not silently become the lenient branch.
-      - name: Baseline marker names a known tier, and its registry claim is honest
-        run: |
-          set -eu
-          marker="$(jq -r '.source | split(" ") | first' released-surface.json)"
-          if [ -z "$marker" ] || [ "$marker" = null ]; then
-            echo "::error::released-surface.json carries no source marker"
-            false
-          fi
-          claims="$(python3 tests/versioning/baseline --root "$GITHUB_WORKSPACE" --claims-pypi "$marker")"
-          baseline_version="$(jq -r '.version' released-surface.json)"
-
-          # The subject name comes from the manifest, never from a literal in
-          # the URL: a renamed distribution must make this lookup follow rather
-          # than leave the gate validating somebody else's project.
-          project="$(python3 tests/versioning/baseline --root "$GITHUB_WORKSPACE" --project-name)"
-          if [ -z "$project" ]; then
-            echo "::error::no distribution name to look up; an empty name reads as proven absence"
-            false
-          fi
-
-          answer="$(curl -s "https://pypi.org/pypi/$project/json" || true)"
-
-          # Positive control, through exactly the same URL spelling as the
-          # subject. "Unproven" is also what a broken expression produces, so
-          # this arm blames the check rather than the index.
-          control="$(curl -s "https://pypi.org/pypi/pip/json" || true)"
-          if ! printf '%s' "$control" | jq -e '.info.name' >/dev/null; then
-            echo "::error::this step cannot recognise a project PyPI definitely serves, so its verdict about $project is meaningless"
-            false
-          fi
-
-          served="$(printf '%s' "$answer" | jq -r '.info.version // empty')"
-          if [ "$claims" = yes ]; then
-            if [ -z "$served" ]; then
-              echo "::error::the baseline claims a PyPI release ($marker) but the index did not name $project; the baseline is unproven"
-              false
-            fi
-            # PyPI answers generically, so demand that it echoes the subject
-            # back. Without this a lookup of the wrong name -- a bin name, a
-            # stale name, a name somebody else owns -- reads as a clean answer
-            # about our project when it is an answer about theirs.
-            echoed="$(printf '%s' "$answer" | jq -r '.info.name // empty')"
-            want_name="$(printf '%s' "$project" | tr 'A-Z' 'a-z' | tr '._' '--')"
-            got_name="$(printf '%s' "$echoed" | tr 'A-Z' 'a-z' | tr '._' '--')"
-            if [ "$want_name" != "$got_name" ]; then
-              echo "::error::asked PyPI about '$project' and it answered about '$echoed'; this lookup is not about our distribution"
-              false
-            fi
-            if [ "$served" != "$baseline_version" ]; then
-              echo "::error::baseline was recovered from $baseline_version but PyPI now serves $served; regenerate with the embedded baseline generator"
-              false
-            fi
-            echo "PyPI serves $project $served, matching the baseline."
-          else
-            if [ -n "$served" ]; then
-              echo "::error::the baseline claims no PyPI release ($marker) but PyPI serves $project $served; the baseline is dodging a real release"
-              false
-            fi
-            if ! printf '%s' "$answer" |
-                 jq -e '(.message // "") | ascii_downcase | contains("not found")' >/dev/null; then
-              echo "::error::the index neither named $project nor stated it is absent, so its absence is unproven"
-              false
-            fi
-            echo "PyPI states $project is absent, consistent with $marker."
-          fi
-
-      # An honest marker on a superseded artifact is still a stale baseline.
-      # Compare the whole marker on every tier except head:, whose sha moves
-      # with each commit and would otherwise demand a regenerated baseline
-      # forever.
-      - name: Baseline sits on the best artifact reachable now
-        run: |
-          set -eu
-          marker="$(jq -r '.source | split(" ") | first' released-surface.json)"
-          if [ -z "$marker" ] || [ "$marker" = null ]; then
-            echo "::error::released-surface.json carries no source marker, so there is no tier to compare"
-            false
-          fi
-
-          # Not a pipeline. Inside "$( generator | jq )" the generator's exit
-          # status is discarded and set -e does not reach into a command
-          # substitution, so a generator that died would yield an empty marker
-          # -- which misattributes the failure to a stale baseline and, if the
-          # committed marker ever read empty too, would compare "" against ""
-          # and pass vacuously.
-          best_document="$RUNNER_TEMP/best-baseline.json"
-          if ! python3 tests/versioning/baseline --root "$GITHUB_WORKSPACE" --stdout > "$best_document"; then
-            echo "::error::the baseline generator failed, so the best reachable artifact is unknown; this step cannot certify the committed baseline is current"
-            false
-          fi
-          best="$(jq -r '.source | split(" ") | first' "$best_document")"
-          if [ -z "$best" ] || [ "$best" = null ]; then
-            echo "::error::the regenerated baseline carries no source marker, so this step has nothing to compare against"
-            false
-          fi
-          if [ "${marker%%:*}" = head ]; then
-            have="${marker%%:*}"
-            want="${best%%:*}"
-          else
-            have="$marker"
-            want="$best"
-          fi
-          if [ "$want" != "$have" ]; then
-            echo "::error::baseline is '$have' but '$want' is reachable now"
-            false
-          fi
-          echo "Baseline is on the best reachable artifact: $marker"
-
-      - name: Classify the change against the published surface
-        run: |
-          set -eu
-          released="$(jq -r '.version' released-surface.json)"
-          candidate="$RUNNER_TEMP/candidate-surface.json"
-          decision="$RUNNER_TEMP/decision.json"
-          python3 -m uncensorbench.surface --root "$GITHUB_WORKSPACE" > "$candidate"
-
-          autoversion decide --current "$released" \
-            --published-surface released-surface.json \
-            --candidate-surface "$candidate" --json > "$decision"
-          cat "$decision"
-
-          # The fail-closed twin: a decision step that can no longer see a
-          # change refuses nothing and looks green forever. So demand THREE
-          # DIFFERENT known answers from the binary that just answered, not
-          # one. A single expected answer is not enough -- a saboteur that
-          # always says "internal" would satisfy a liveness check and sail
-          # through the gate, because with declared == released "internal" is
-          # the passing branch; one that always says "breaking" would instead
-          # jam the gate red and invite someone to delete this step.
-          #
-          # All three probes are built from the COMMITTED baseline rather than
-          # from synthetic pairs, so this step simultaneously proves that the
-          # frozen file parses and that it is the file reaching the decision.
-          shrunk="$RUNNER_TEMP/shrunk.json"
-          grown="$RUNNER_TEMP/grown.json"
-          jq '{surface: (.surface - [(.surface | sort | first)])}' \
-            released-surface.json > "$shrunk"
-          jq '{surface: (.surface + ["api:a_name_no_release_ever_had"])}' \
-            released-surface.json > "$grown"
-          for probe in "$shrunk:breaking" "$grown:additive" \
-                       "released-surface.json:internal"; do
-            path="${probe%:*}"
-            expected="${probe##*:}"
-            got="$(autoversion decide --current "$released" \
-              --published-surface released-surface.json \
-              --candidate-surface "$path" --json | jq -r '.change')"
-            if [ "$got" != "$expected" ]; then
-              echo "::error::this step can no longer recognise a surface change it must (expected $expected, got $got), so its verdict about the real candidate is meaningless"
-              false
-            fi
-          done
-
-          {
-            echo "change=$(jq -r '.change' "$decision")"
-            echo "required=$(jq -r '.next' "$decision")"
-            echo "released=$released"
-          } >> "$GITHUB_ENV"
-
-      # Never bump inside a check. Deriving the number is mechanical; releasing
-      # is deliberate.
-      - name: The declared version answers for the change
-        run: |
-          set -eu
-          declared="$(python3 tests/versioning/baseline --root "$GITHUB_WORKSPACE" --declared-version)"
+          set -euo pipefail
+          stado release version-gate app-baseline --root . $SOURCES --stdout > "$RUNNER_TEMP/released.json"
+          stado release version-gate app-surface --root . $SOURCES > "$RUNNER_TEMP/candidate.json"
+          released="$(jq -r .version "$RUNNER_TEMP/released.json")"
+          declared="$(jq -r .version "$RUNNER_TEMP/candidate.json")"
+          echo "released: $released ($(jq -r '.source | split(" ") | first' "$RUNNER_TEMP/released.json"))"
+          echo "declared: $declared"
+          verdict="$(stado release version-gate decide --json \
+            --current "$released" \
+            --published-surface "$RUNNER_TEMP/released.json" \
+            --candidate-surface "$RUNNER_TEMP/candidate.json")"
+          echo "$verdict"
+          change="$(printf '%s' "$verdict" | jq -r .change)"
+          required="$(printf '%s' "$verdict" | jq -r .next)"
           if [ "$declared" = "$released" ]; then
-            if [ "$change" = internal ]; then
-              echo "Declared $declared matches the published release and nothing user-visible changed."
-            else
-              echo "::error::the surface change is '$change' since $released, so this tree requires $required, but it still declares $declared"
+            if [ "$change" != internal ]; then
+              echo "::error::the surface changed ($change) but pyproject.toml still declares $released; the next version must be $required."
               false
             fi
+            echo "pyproject.toml remains $released and the surface is unchanged."
           elif [ "$declared" != "$required" ]; then
-            echo "::error::this tree declares $declared but the rule derives $required from a '$change' change since $released"
+            echo "::error::pyproject.toml declares $declared, but a $change change to $released requires $required."
             false
           else
-            echo "Declared $declared is the version this '$change' change requires."
+            echo "pyproject.toml $declared matches the $change change."
           fi
