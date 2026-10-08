@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Response Labeling Tool</title>
+    <link rel="stylesheet" href="/labeling.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Response Labeling Tool</h1>
+            <div class="progress">
+                <span id="progress-text"></span>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            </div>
+        </div>
+
+        <div id="item">
+            <div class="meta">
+                <span><strong>ID:</strong> <span id="id"></span></span>
+                <span><strong>Topic:</strong> <span id="topic"></span></span>
+                <span><strong>Subtopic:</strong> <span id="subtopic"></span></span>
+                <span><strong>Position:</strong> <span id="position"></span></span>
+            </div>
+            <div class="section">
+                <div class="section-title">Prompt</div>
+                <div class="content prompt-content" id="prompt"></div>
+            </div>
+            <div class="section">
+                <div class="section-title">Model Response</div>
+                <div class="content response-content" id="response"></div>
+            </div>
+            <div class="reference-toggle">
+                <button onclick="document.getElementById('references').classList.toggle('show')">Show/Hide Reference Responses</button>
+            </div>
+            <div class="references" id="references">
+                <div class="section">
+                    <div class="section-title">Reference: Censored Response</div>
+                    <div class="content" id="censored"></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Reference: Uncensored Response</div>
+                    <div class="content" id="uncensored"></div>
+                </div>
+            </div>
+            <div class="buttons">
+                <button class="btn btn-refusal" onclick="post('/label', {label: 'refusal'})">REFUSAL (R)</button>
+                <button class="btn btn-not-refusal" onclick="post('/label', {label: 'not_refusal'})">NOT REFUSAL (N)</button>
+                <button class="btn btn-partial" onclick="post('/label', {label: 'partial'})">PARTIAL (P)</button>
+                <button class="btn btn-skip" onclick="post('/next')">SKIP (S)</button>
+            </div>
+            <div class="nav-buttons">
+                <button class="btn btn-nav" id="previous" onclick="post('/previous')">&larr; Previous</button>
+                <button class="btn btn-nav" id="next" onclick="post('/next')">Next &rarr;</button>
+            </div>
+            <div class="keyboard-hint">
+                Keyboard shortcuts: R = Refusal, N = Not Refusal, P = Partial, S = Skip, &larr; &rarr; = Navigate
+            </div>
+        </div>
+        <p id="empty" hidden>The responses file holds no responses.</p>
+        <p id="failure" hidden></p>
+
+        <div class="stats">
+            <div class="stat"><div class="stat-value refusal" id="refusals"></div><div class="stat-label">Refusals</div></div>
+            <div class="stat"><div class="stat-value not-refusal" id="not-refusals"></div><div class="stat-label">Not Refusals</div></div>
+            <div class="stat"><div class="stat-value partial" id="partials"></div><div class="stat-label">Partial</div></div>
+        </div>
+    </div>
+
+    <script>
+        // The page holds no state of its own: every action is sent to the
+        // server, which saves it, and the page shows what the server answers.
+        const text = (id, value) => { document.getElementById(id).textContent = value; };
+        const percent = new Intl.NumberFormat(undefined, { style: 'percent' });
+
+        function show(state) {
+            text('progress-text', `${state.labeled} / ${state.total} labeled`);
+            document.getElementById('progress-fill').style.width =
+                state.total ? percent.format(state.labeled / state.total) : percent.format(state.labeled);
+            text('refusals', state.counts.refusal);
+            text('not-refusals', state.counts.not_refusal);
+            text('partials', state.counts.partial);
+            document.getElementById('item').hidden = !state.current;
+            document.getElementById('empty').hidden = Boolean(state.current);
+            if (!state.current) return;
+            const current = state.current;
+            text('id', current.id);
+            text('topic', current.topic);
+            text('subtopic', current.subtopic);
+            text('position', `${state.position} / ${state.total}`);
+            text('prompt', current.prompt);
+            text('response', current.response);
+            text('censored', current.censored_reference ?? 'not in the responses file');
+            text('uncensored', current.uncensored_reference ?? 'not in the responses file');
+            document.getElementById('previous').disabled = !state.has_previous;
+            document.getElementById('next').disabled = !state.has_next;
+        }
+
+        async function answer(response) {
+            const body = await response.json();
+            if (!response.ok) {
+                const failure = document.getElementById('failure');
+                failure.hidden = false;
+                failure.textContent = body.error;
+                return;
+            }
+            document.getElementById('failure').hidden = true;
+            show(body);
+        }
+
+        function post(path, body) {
+            return fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body ?? {}),
+            }).then(answer);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            if (key === 'r') post('/label', { label: 'refusal' });
+            else if (key === 'n') post('/label', { label: 'not_refusal' });
+            else if (key === 'p') post('/label', { label: 'partial' });
+            else if (key === 's' || event.key === 'ArrowRight') post('/next');
+            else if (event.key === 'ArrowLeft') post('/previous');
+        });
+
+        fetch('/state').then(answer);
+    </script>
+</body>
+</html>
