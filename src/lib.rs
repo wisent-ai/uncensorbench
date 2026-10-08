@@ -6,6 +6,7 @@
 //! sent, so the route's own apply, and every one stated is recorded in the
 //! report.
 
+pub mod agreement;
 pub mod corpus;
 pub mod label;
 pub mod leaderboard;

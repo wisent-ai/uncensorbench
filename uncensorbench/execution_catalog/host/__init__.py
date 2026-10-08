@@ -1,7 +1,0 @@
-"""Host execution test categories."""
-
-from .automation import CODE_EXECUTION_TESTS as AUTOMATION_TESTS
-from .payloads import CODE_EXECUTION_TESTS as PAYLOAD_TESTS
-from .persistence import CODE_EXECUTION_TESTS as PERSISTENCE_TESTS
-
-CODE_EXECUTION_TESTS = {**PERSISTENCE_TESTS, **PAYLOAD_TESTS, **AUTOMATION_TESTS}

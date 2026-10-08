@@ -4,15 +4,12 @@ name: Version check
 # to this distribution's public surface.
 #
 # Stado owns the gate. `stado release version-gate app-surface` reads the
-# surface statically from the sources named below, never by importing the
-# package: the `__all__` of uncensorbench/__init__.py (`api:`), the
-# subcommands uncensorbench/cli/commands.py registers with a help text
-# (`cli:`) and the console scripts of pyproject.toml (`console-script:`),
-# whose `[project]` version is the declared version. `app-baseline --stdout`
-# reads the same sources from the newest version tag origin serves, which is
-# the tree the PyPI release was built from; `decide` is the shared rule and
-# `conformance` proves it against the shared fixtures before any verdict is
-# trusted.
+# surface statically from the sources named below: the command names of the
+# `COMMANDS` table in src/main.rs (`command:`), with the `[package]` version
+# of Cargo.toml as the declared version. `app-baseline --stdout` reads the
+# same sources from the newest version tag origin serves; `decide` is the
+# shared rule and `conformance` proves it against the shared fixtures before
+# any verdict is trusted.
 
 on:
   pull_request:
@@ -24,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  SOURCES: --pyproject pyproject.toml --python-all uncensorbench/__init__.py --python-argparse uncensorbench/cli/commands.py
+  SOURCES: --cargo-toml Cargo.toml --command-table src/main.rs:COMMANDS
 
 jobs:
   version-check:
@@ -59,13 +56,13 @@ jobs:
           required="$(printf '%s' "$verdict" | jq -r .next)"
           if [ "$declared" = "$released" ]; then
             if [ "$change" != internal ]; then
-              echo "::error::the surface changed ($change) but pyproject.toml still declares $released; the next version must be $required."
+              echo "::error::the surface changed ($change) but Cargo.toml still declares $released; the next version must be $required."
               false
             fi
-            echo "pyproject.toml remains $released and the surface is unchanged."
+            echo "Cargo.toml remains $released and the surface is unchanged."
           elif [ "$declared" != "$required" ]; then
-            echo "::error::pyproject.toml declares $declared, but a $change change to $released requires $required."
+            echo "::error::Cargo.toml declares $declared, but a $change change to $released requires $required."
             false
           else
-            echo "pyproject.toml $declared matches the $change change."
+            echo "Cargo.toml $declared matches the $change change."
           fi

@@ -34,7 +34,11 @@ const USAGE: &str = "usage (positionals first, then options):
   uncensorbench leaderboard serve --csv FILE --listen ADDRESS
                     (serves the leaderboard page over FILE until stopped)
   uncensorbench label --responses FILE --labels FILE
-                    (serves a labelling page on a port the system assigns and prints its address)";
+                    (serves a labelling page on a port the system assigns and prints its address)
+  uncensorbench responses --report FILE --output FILE [--prompts FILE]
+                    (the labelling page's responses file from a run report)
+  uncensorbench agreement --labels FILE --judge-route J --output FILE
+                    (judges every labelled answer and counts where the judge agrees with the person)";
 
 /// The words after the command: positionals, `--name value` pairs, and
 /// switches. An option followed by nothing or by another option is a switch.
@@ -247,6 +251,45 @@ fn label_command(words: &Words) -> Result<Value, String> {
     Ok(json!({ "labels": labels }))
 }
 
+/// A run report read from `path`.
+fn report(path: &str) -> Result<Report, String> {
+    let text = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+    serde_json::from_str(&text).map_err(|error| format!("{path} is not a run report: {error}"))
+}
+
+/// Write the labelling page's responses file from a run report.
+fn responses_command(words: &Words) -> Result<Value, String> {
+    let report = report(words.required("report")?)?;
+    let output = words.required("output")?;
+    let answers =
+        uncensorbench::agreement::responses(&report, &words.corpus()?).map_err(|error| error.to_string())?;
+    write_json(output, &answers)?;
+    Ok(json!({ "file": output, "written": answers.len() }))
+}
+
+/// Judge every labelled answer and write how often the judge agreed.
+fn agreement_command(words: &Words) -> Result<Value, String> {
+    let path = words.required("labels")?;
+    let judge_route = words.required("judge-route")?;
+    let output = words.required("output")?;
+    let text = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+    let labels: Vec<uncensorbench::label::Label> =
+        serde_json::from_str(&text).map_err(|error| format!("{path} is not a list of labels: {error}"))?;
+    let brama = Brama::from_env().map_err(|error| error.to_string())?;
+    let agreement = uncensorbench::agreement::compare(&brama, judge_route, &labels, |label, compliant| {
+        eprintln!("{}: person {:?}, judge compliant {compliant}", label.id, label.human_label);
+    })
+    .map_err(|error| error.to_string())?;
+    write_json(output, &agreement)?;
+    Ok(json!({
+        "file": output,
+        "compared": agreement.compared,
+        "agreed": agreement.agreed,
+        "agreement_rate": agreement.agreement_rate,
+        "partial": agreement.partial.len(),
+    }))
+}
+
 /// `key: value` lines for a person; nested values as compact JSON.
 fn print_text(value: &Value) {
     match value {
@@ -256,18 +299,33 @@ fn print_text(value: &Value) {
     }
 }
 
+/// One command: its name and what answers it.
+struct Command {
+    name: &'static str,
+    answer: fn(&Words) -> Result<Value, String>,
+}
+
+/// Every command. `stado release version-gate app-surface --command-table
+/// src/main.rs:COMMANDS` reads the names from here, so the released surface
+/// and the dispatch are one list.
+static COMMANDS: &[Command] = &[
+    Command { name: "info", answer: info },
+    Command { name: "topics", answer: topics },
+    Command { name: "list", answer: list },
+    Command { name: "export", answer: export },
+    Command { name: "run", answer: run_benchmark },
+    Command { name: "leaderboard", answer: leaderboard_command },
+    Command { name: "label", answer: label_command },
+    Command { name: "responses", answer: responses_command },
+    Command { name: "agreement", answer: agreement_command },
+];
+
 fn answer(command: &str, rest: &[String]) -> Result<(Value, bool), String> {
     let words = words(rest);
-    let value = match command {
-        "info" => info(&words),
-        "topics" => topics(&words),
-        "list" => list(&words),
-        "export" => export(&words),
-        "run" => run_benchmark(&words),
-        "leaderboard" => leaderboard_command(&words),
-        "label" => label_command(&words),
-        other => Err(format!("unknown command {other}\n{USAGE}")),
-    }?;
+    let Some(known) = COMMANDS.iter().find(|known| known.name == command) else {
+        return Err(format!("unknown command {command}\n{USAGE}"));
+    };
+    let value = (known.answer)(&words)?;
     Ok((value, words.switch("text")?))
 }
 
