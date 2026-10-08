@@ -1,5 +1,0 @@
-dash==2.14.2
-dash-ag-grid==31.0.1
-pandas
-numpy
-gunicorn

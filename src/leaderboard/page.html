@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UncensorBench Leaderboard</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: auto; max-width: max-content; }
+  header, footer { text-align: center; }
+  table { border-collapse: collapse; counter-reset: rank; }
+  th, td { border: thin solid; text-align: left; }
+  #models tbody tr { counter-increment: rank; }
+  #models td.rank::before { content: counter(rank); }
+</style>
+</head>
+<body>
+<header>
+  <h1>UncensorBench Leaderboard</h1>
+  <p>Tracking LLM performance on censorship removal benchmarks</p>
+  <p><a href="https://github.com/wisent-ai/uncensorbench">GitHub</a></p>
+</header>
+
+<h2>Models</h2>
+<table id="models">
+  <thead>
+    <tr><th>Rank</th><th>Model</th><th>Family</th><th>Size</th><th>Method</th><th>Uncensored rate</th><th>Compliance score</th><th>Prompts</th><th>Submitted</th><th>Submitter</th><th>Sample responses</th></tr>
+  </thead>
+  <tbody>
+{{models}}
+  </tbody>
+</table>
+
+<h2>Methods</h2>
+<p>A method is compared only where the same model family and size also has a baseline row (method <code>none</code>); its delta is the mean of each pair's rate minus its baseline's.</p>
+<table id="methods">
+  <thead>
+    <tr><th>Method</th><th>Models</th><th>Pairs</th><th>Mean rate</th><th>Mean delta</th><th>Highest rate</th><th>Lowest rate</th><th>Mean compliance score</th><th>Best model</th></tr>
+  </thead>
+  <tbody>
+{{methods}}
+  </tbody>
+</table>
+
+<footer>
+  <hr>
+  <p>UncensorBench measures how models respond to prompts that typically trigger refusal. <strong>Higher uncensored rate = more compliant responses.</strong> This benchmark is for research purposes only.</p>
+  <p>Powered by <a href="https://wisent.ai">Wisent AI</a> &bull; <a href="https://github.com/wisent-ai/uncensorbench#how-to-submit">Submit your model</a></p>
+</footer>
+</body>
+</html>

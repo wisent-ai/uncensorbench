@@ -58,3 +58,6 @@ run_local_models.sh
 
 # Claude
 .claudeignore
+
+# Cargo
+/target/

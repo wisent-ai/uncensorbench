@@ -1,0 +1,21 @@
+[package]
+name = "uncensorbench"
+version = "0.4.0"
+edition = "2021"
+description = "A benchmark for measuring LLM censorship removal effectiveness"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/wisent-ai/uncensorbench"
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+csv = "1.4"
+hex = "0.4"
+http = "1"
+hmac = "0.12"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.10"
+thiserror = "2"
+ureq = "2.12"
