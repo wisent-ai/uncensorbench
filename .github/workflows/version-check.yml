@@ -3,10 +3,10 @@ name: Version check
 # Refuse a change whose declared version disagrees with what the change did
 # to this distribution's public surface.
 #
-# Stado owns the gate. `stado release version-gate app-surface` reads the
+# Stado owns the gate. `stado release gate app surface` reads the
 # surface statically from the sources named below: the command names of the
 # `COMMANDS` table in src/main.rs (`command:`), with the `[package]` version
-# of Cargo.toml as the declared version. `app-baseline --stdout` reads the
+# of Cargo.toml as the declared version. `app baseline --stdout` reads the
 # same sources from the newest version tag origin serves; `decide` is the
 # shared rule and `conformance` proves it against the shared fixtures before
 # any verdict is trusted.
@@ -36,18 +36,18 @@ jobs:
         run: git fetch --force --tags --unshallow || git fetch --force --tags
 
       - name: Prove the versioning rule against the shared fixtures
-        run: stado release version-gate conformance
+        run: stado release gate conformance
 
       - name: Compare the surface against the released tag
         run: |
           set -euo pipefail
-          stado release version-gate app-baseline --root . $SOURCES --stdout > "$RUNNER_TEMP/released.json"
-          stado release version-gate app-surface --root . $SOURCES > "$RUNNER_TEMP/candidate.json"
+          stado release gate app baseline --root . $SOURCES --stdout > "$RUNNER_TEMP/released.json"
+          stado release gate app surface --root . $SOURCES > "$RUNNER_TEMP/candidate.json"
           released="$(jq -r .version "$RUNNER_TEMP/released.json")"
           declared="$(jq -r .version "$RUNNER_TEMP/candidate.json")"
           echo "released: $released ($(jq -r '.source | split(" ") | first' "$RUNNER_TEMP/released.json"))"
           echo "declared: $declared"
-          verdict="$(stado release version-gate decide --json \
+          verdict="$(stado release gate decide --json \
             --current "$released" \
             --published-surface "$RUNNER_TEMP/released.json" \
             --candidate-surface "$RUNNER_TEMP/candidate.json")"
