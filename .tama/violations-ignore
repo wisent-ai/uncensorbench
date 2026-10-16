@@ -6,3 +6,15 @@ assets/readme-banner.svg
 # This product status is an externally defined product declaration. The published
 # contract reads it from the repository root, so it cannot honestly move.
 commercial-status.json
+# The repository root. Every file below is read from the root by the
+# tool named beside it, so none of them can move into a folder and the
+# five-files-per-folder rule cannot be met here. Written by
+# `tama violations declare-root`, which refuses to write this while the root still
+# holds a file somebody could move.
+#   .gitignore — git
+#   Cargo.lock — cargo
+#   Cargo.toml — cargo
+#   LICENSE — GitHub reads the licence from the root
+#   README.md — GitHub shows it on the repository page
+#   commercial-status.json — the fleet reads a product's commercial posture from this exact path
+.

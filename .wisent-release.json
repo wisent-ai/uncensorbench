@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "product": "uncensorbench",
+  "releases": false,
+  "reason": "No release is published: origin holds no version tag, and the repository's only workflow is the pull-request version check; there is no package, image or binary publisher."
+}

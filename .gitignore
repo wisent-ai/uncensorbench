@@ -61,3 +61,4 @@ run_local_models.sh
 
 # Cargo
 /target/
+/.build/
