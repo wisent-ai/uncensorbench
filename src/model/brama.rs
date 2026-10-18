@@ -75,10 +75,11 @@ impl Brama {
         self.complete(route, text, sampling, None)
     }
 
-    /// `text` as the only user turn to `route`, its answer bound to the JSON
-    /// `schema` named `name` (`response_format` `json_schema`, strict) and
-    /// read as that object: an answer that is not one JSON object is refused
-    /// with the answer, never searched for an object inside its prose.
+    /// `text` as the only user turn to `route`, answered by one required
+    /// call of the function `name` whose parameters are the JSON `schema`
+    /// (strict), and read as that call's arguments: an answer without exactly
+    /// that call, or whose arguments are not one JSON object, is refused with
+    /// the answer, never searched for an object inside its prose.
     pub fn object(
         &self,
         route: &str,
@@ -87,8 +88,13 @@ impl Brama {
         name: &str,
         schema: Value,
     ) -> Result<Value, Error> {
-        let format = json!({ "type": "json_schema", "json_schema": { "name": name, "strict": true, "schema": schema } });
-        let said = self.complete(route, text, sampling, Some(format))?;
+        let function = json!({
+            "name": name,
+            "description": format!("The {name} answer, as its parameters describe it."),
+            "strict": true,
+            "parameters": schema,
+        });
+        let said = self.complete(route, text, sampling, Some(function))?;
         match serde_json::from_str::<Value>(said.trim()) {
             Ok(object @ Value::Object(_)) => Ok(object),
             Ok(_) => Err(Error::Brama(format!(
@@ -100,12 +106,14 @@ impl Brama {
         }
     }
 
+    /// The answer's text, or, when `function` is given, the arguments of the
+    /// one call of it the request requires.
     fn complete(
         &self,
         route: &str,
         text: &str,
         sampling: &Sampling,
-        format: Option<Value>,
+        function: Option<Value>,
     ) -> Result<String, Error> {
         let mut body = serde_json::to_value(sampling).map_err(|error| {
             Error::Brama(format!(
@@ -114,8 +122,11 @@ impl Brama {
         })?;
         body["model"] = json!(route);
         body["messages"] = json!([{ "role": "user", "content": text }]);
-        if let Some(format) = format {
-            body["response_format"] = format;
+        let called = function.as_ref().map(|function| function["name"].clone());
+        if let Some(function) = function {
+            body["tool_choice"] =
+                json!({ "type": "function", "function": { "name": function["name"] } });
+            body["tools"] = json!([{ "type": "function", "function": function }]);
         }
         let body = body.to_string();
         let endpoint = format!("{}{CHAT}", self.url);
@@ -162,6 +173,25 @@ impl Brama {
                 "{endpoint} answered {route} with no JSON ({error}): {raw}"
             ))
         })?;
+        let first = answer["choices"]
+            .as_array()
+            .and_then(|choices| choices.first());
+        if let Some(name) = called {
+            let calls = first.and_then(|choice| choice["message"]["tool_calls"].as_array());
+            return match calls.map(Vec::as_slice) {
+                Some([call]) if call["function"]["name"] == name => call["function"]["arguments"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| {
+                        Error::Brama(format!(
+                            "{endpoint}: {route}'s call of {name} carries no arguments: {raw}"
+                        ))
+                    }),
+                _ => Err(Error::Brama(format!(
+                    "{endpoint}: {route} did not answer by exactly one call of {name}: {raw}"
+                ))),
+            };
+        }
         answer["choices"]
             .as_array()
             .and_then(|choices| choices.first())
