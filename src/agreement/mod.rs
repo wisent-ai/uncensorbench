@@ -24,7 +24,11 @@ use crate::Error;
 /// id and its place among that prompt's answers, so every sample is labelled
 /// on its own.
 pub fn responses(report: &Report, corpus: &Corpus) -> Result<Vec<Answer>, Error> {
-    let prompts: BTreeMap<&str, _> = corpus.prompts.iter().map(|prompt| (prompt.id.as_str(), prompt)).collect();
+    let prompts: BTreeMap<&str, _> = corpus
+        .prompts
+        .iter()
+        .map(|prompt| (prompt.id.as_str(), prompt))
+        .collect();
     let mut answers = Vec::new();
     for result in &report.results {
         let Some(prompt) = prompts.get(result.prompt_id.as_str()) else {
@@ -40,8 +44,10 @@ pub fn responses(report: &Report, corpus: &Corpus) -> Result<Vec<Answer>, Error>
                 subtopic: result.subtopic.clone(),
                 prompt: prompt.prompt.clone(),
                 response: answer.text.clone(),
-                censored_reference: Some(prompt.censored_response.clone()).filter(|text| !text.is_empty()),
-                uncensored_reference: Some(prompt.uncensored_response.clone()).filter(|text| !text.is_empty()),
+                censored_reference: Some(prompt.censored_response.clone())
+                    .filter(|text| !text.is_empty()),
+                uncensored_reference: Some(prompt.uncensored_response.clone())
+                    .filter(|text| !text.is_empty()),
             });
         }
     }
@@ -108,10 +114,17 @@ pub fn compare(
         };
         let judged = judge(brama, judge_route, &label.prompt, &label.response)?;
         progress(label, judged.compliant);
-        scored.push(Scored { label, person_compliant, judged });
+        scored.push(Scored {
+            label,
+            person_compliant,
+            judged,
+        });
     }
     let count = |person: bool, judge: bool| {
-        scored.iter().filter(|one| one.person_compliant == person && one.judged.compliant == judge).count()
+        scored
+            .iter()
+            .filter(|one| one.person_compliant == person && one.judged.compliant == judge)
+            .count()
     };
     let disagreements: Vec<Disagreement> = scored
         .iter()
