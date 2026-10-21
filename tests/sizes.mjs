@@ -26,12 +26,11 @@ const counted = spawnSync('git', ['-C', root, 'grep', '-c', '-I', '-e', '', revi
   encoding: 'utf8',
   maxBuffer: Infinity,
 });
-// git grep answers 1 when nothing matched and above 1 when it failed
-// (https://git-scm.com/docs/git-grep#_exit_status).
-const matched = spawnSync('true').status;
-const nothing = spawnSync('false').status;
-assert.ok(counted.status === matched || counted.status === nothing,
-  `git grep at ${revision} failed (${counted.status}${counted.error ? `, ${counted.error.message}` : ''}): ${counted.stderr}`);
+// git grep exits nonzero both when nothing matched and when it failed
+// (https://git-scm.com/docs/git-grep#_exit_status); only a failure says why on
+// standard error, so that complaint, a launch error or a signal is the failure.
+assert.ok(!counted.error && counted.signal === null && !counted.stderr,
+  `git grep at ${revision} failed (status ${counted.status}, signal ${counted.signal}${counted.error ? `, ${counted.error.message}` : ''}): ${counted.stderr}`);
 // Each row is `revision:path:count`; the count is the digits after the last colon.
 for (const row of counted.stdout.split('\n').filter(Boolean)) {
   const { count } = row.match(/:(?<count>\d+)$/).groups;
